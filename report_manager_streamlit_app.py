@@ -369,7 +369,7 @@ def Customers_Taxes_Report():
 # section 1 on ui
 
 # UI info welcome text
-st.title("Azure Store Report Manger UI")
+st.title("Azure Store Report Manager UI")
 st.write("Welcome to report manager and azure database exploration ***Web application***, developed by **Moshe Khorshidi**.")
 st.write("***Phone: +972-526775714 , eMail: MosheKhorshidi@gmail.com***, ***LinkedIn:*** [My LinkedIn Profile 👋](https://www.linkedin.com/in/moshe-khorshidi-sql-python-tableau-data-engineering-data-science/) ")
 
