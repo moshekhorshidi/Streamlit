@@ -1,0 +1,11 @@
+Table Name,Schema Name,Schema ID
+Address,SalesLT,5
+CustomerAddress,SalesLT,5
+CustomerInfo,SalesLT,5
+Product,SalesLT,5
+ProductCategory,SalesLT,5
+ProductDescription,SalesLT,5
+ProductModel,SalesLT,5
+ProductModelProductDescription,SalesLT,5
+SalesOrderDetail,SalesLT,5
+SalesOrderHeader,SalesLT,5
