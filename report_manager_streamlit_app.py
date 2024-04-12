@@ -6,6 +6,8 @@ import time
 # ui function section 
 # section 1 on ui
 
+st.set_page_config(page_title = 'Moshe khorshidi Report Manager',page_icon='📊')
+
 # UI info welcome text
 st.title("Azure Store Report Manager UI")
 st.write("Welcome to report manager and azure database exploration ***Web application***, developed by **Moshe Khorshidi**.")
