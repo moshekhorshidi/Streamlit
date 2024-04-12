@@ -1,371 +1,9 @@
 import streamlit as st
 import datetime
-import pyodbc as db
 import pandas as pd
 import time
-import requests
-
-connection_string = 'DRIVER={ODBC Driver 17 for SQL Server};SERVER=roboto-db-ui.database.windows.net;DATABASE=roboto-database-ui-streamlit-webapp;UID=moshe_khorshidi;PWD=roboto100!@'
-
-col1, col2, col3 = st.columns([1,2,1],gap='large')
-
-# function define section
-
-def engine_connect(): 
-    conn = db.connect(connection_string)
-    return conn 
-
-
-def check_conn():
-    try:      
-        db.connect(connection_string)
-        return True
-    except: 
-        return False
-
-
-def get_user_ip():
-    try:
-        response = requests.get('https://ipinfo.io')
-        data = response.json()
-        ip =  data.get('ip')
-        return str(ip)
-    except Exception as e:
-        print(f"Error getting IP: {e}")
-        return None
-
-
-def collect_user_data():
-
-    conn = engine_connect()
-    cursor = conn.cursor()
-
-    get_ip = get_user_ip()
-    ip = get_ip
-    # Insert the user's IP address and get the generated UserID
-
-    # Get the generated UserID for the current user
-    cursor.execute("SELECT NEWID()")
-    get_user_id_from_engine = cursor.fetchone()
-    chars_to_replace = "(),"
-    user_id_to_str = str(get_user_id_from_engine)
-    user_id_clean = ''.join(char for char in user_id_to_str if char not in chars_to_replace)
-    
-    visit_date = datetime.date.today()
-
-    cursor.execute(f"INSERT INTO dbo.UserDataCollect (UserID,UserIP,VisitDateTime) VALUES ({user_id_clean},'{ip}','{visit_date}')")
-    conn.commit()
-    #cursor.execute(f"INSERT INTO dbo.UserDataCollect (UserIP) values ()")
-    #conn.commit()
-    conn.close()
-
-
-
-
-def azure_table_names():
-
-# Create a database connection
-    conn = engine_connect()
-
-# SQL query code
-    query = """ SELECT distinct t.name as "Table Name",
-                s.name as "Schema Name",
-                s.schema_id as "Schema ID"
-                FROM sys.tables t inner join sys.schemas s
-	            ON t.schema_id = s.schema_id
-                where t.name not in('Customer', 'ErrorLog')
-                and s.name = 'SalesLT'
-                union 
-                select name, 'SalesLT' , schema_id 
-                from sys.views v
-                where v.object_id = 1314103722
-                
-                
-            """
-
-# Read and Fatch data
-    query_data_read = pd.read_sql(query,conn)
-    data = pd.DataFrame(query_data_read)
-
-    return data
-
-def query_builder(table):
-    
-    # Create a cursor object
-    conn = engine_connect()
-
-    try: 
-
-        query = f""" select * from SalesLT.{table} order by 1 asc"""
-        query_data_read = pd.read_sql(query,conn)
-        data = pd.DataFrame(query_data_read)
-        
-        return data
-
-    except:
-        
-        st.info("""
-                  User guide check: 
-                  1. Not empty selection or default value - "No Table name selected"
-                  2. Check if table was selected properly from list of tables
-                  3. try to test connection again """)
-        st.info(""" **Tables Names to copy:** CustomerInfo, ProductModel, ProductDescription, Product,
-         ProductCategory, Address, CustomerAddress, SalesOrderDetail, SalesOrderHeader, ProductModelProductDescription""")
-        
-        return ""
-
-def customer_ranking_report():
-
-    # Create a database connection
-    conn = engine_connect()
-
-    # SQL query code
-    query = """
-
-            select 
-                cast(RANK() over (order by sum(sod.OrderQty) desc) as varchar(3) ) as "Customer Ranking",
-                cast(c.customerid as varchar(25)) as "Customer ID",
-                c.CompanyName as "Company Name",
-                CONCAT(FirstName,' ' ,LastName) as "Full Name",
-                case when Title = 'Mr.' then 'M'
-                        when Title = 'Ms.' then 'F'
-                    else null end as "Gender",
-                    count(soh.salesOrderID) as "Total Orders",
-                    sum(sod.OrderQty) as "Total Quentity Orderd",
-                    round(sum(sod.linetotal),3) as "($) Total revenue from customer"
-                    
-            from SalesLT.Customer c 
-            left join SalesLT.CustomerAddress ca 
-                on c.customerid = ca.customerid
-            left join SalesLT.SalesOrderHeader soh
-                on soh.customerid = c.customerid
-            left join SalesLT.salesOrderDetail sod
-            ON sod.salesOrderID = soh.salesOrderID
-            group by c.customerid, Title , CONCAT(FirstName,' ' ,LastName), c.CompanyName
-            having count(soh.salesOrderID) > 0 
-
-            """
-    
-    # Read and Fatch data
-    query_data_read = pd.read_sql(query,conn)
-    data = pd.DataFrame(query_data_read)
-
-    return data
-
-
-def top_ranking_report_customers_qty():
-
-    # Create a database connection
-    conn = engine_connect()
-
-    # SQL query code
-    query = """
-
-                      with report as(
-  select 		  
-                concat('(',cast(RANK() over (order by sum(sod.OrderQty) desc) as varchar(3) ), ')', ' ', c.CompanyName) as "Vizz Company Rank",
-				cast(RANK() over (order by sum(sod.OrderQty) desc) as varchar(3)) as "Customer Ranking", 
-                cast(c.customerid as varchar(25)) as "Customer ID",
-                c.CompanyName as "Company Name",
-                CONCAT(FirstName,' ' ,LastName) as "Full Name",
-                case when Title = 'Mr.' then 'M'
-                        when Title = 'Ms.' then 'F'
-                    else null end as "Gender",
-                    count(soh.salesOrderID) as "Total Orders",
-                    sum(sod.OrderQty) as "Total Quentity Orderd",
-                    round(sum(sod.linetotal),3) as "($) Total revenue from customer"
-                    
-            from SalesLT.Customer c 
-            left join SalesLT.CustomerAddress ca 
-                on c.customerid = ca.customerid
-            left join SalesLT.SalesOrderHeader soh
-                on soh.customerid = c.customerid
-            left join SalesLT.salesOrderDetail sod
-            ON sod.salesOrderID = soh.salesOrderID
-            group by c.customerid, Title , CONCAT(FirstName,' ' ,LastName), c.CompanyName
-            having count(soh.salesOrderID) > 0)
-
-			select 
-				   *
-			from report 
-			where "Customer Ranking" <10
-			
-			
-			
-            """
-    
-    # Read and Fatch data
-    query_data_read = pd.read_sql(query,conn)
-    data = pd.DataFrame(query_data_read)
-
-    return data
-
-
-def top_ranking_report_customers_revenue():
-
-    # Create a database connection
-    conn = engine_connect()
-
-    # SQL query code
-    query = """
-
-                      with report as(
-  select 		  
-                concat('(',cast(RANK() over (order by sum(sod.linetotal) desc) as varchar(3) ), ')', ' ', c.CompanyName) as "Vizz Company Rank",
-				cast(RANK() over (order by sum(sod.linetotal) desc) as varchar(3)) as "Customer Ranking", 
-                cast(c.customerid as varchar(25)) as "Customer ID",
-                c.CompanyName as "Company Name",
-                CONCAT(FirstName,' ' ,LastName) as "Full Name",
-                case when Title = 'Mr.' then 'M'
-                        when Title = 'Ms.' then 'F'
-                    else null end as "Gender",
-                    count(soh.salesOrderID) as "Total Orders",
-                    sum(sod.OrderQty) as "Total Quentity Orderd",
-                    round(sum(sod.linetotal),3) as "($) Total revenue from customer"
-                    
-            from SalesLT.Customer c 
-            left join SalesLT.CustomerAddress ca 
-                on c.customerid = ca.customerid
-            left join SalesLT.SalesOrderHeader soh
-                on soh.customerid = c.customerid
-            left join SalesLT.salesOrderDetail sod
-            ON sod.salesOrderID = soh.salesOrderID
-            group by c.customerid, Title , CONCAT(FirstName,' ' ,LastName), c.CompanyName
-            having count(soh.salesOrderID) > 0)
-
-			select 
-				   *
-			from report 
-			where "Customer Ranking" <10
-			
-			
-			
-            """
-    
-    # Read and Fatch data
-    query_data_read = pd.read_sql(query,conn)
-    data = pd.DataFrame(query_data_read)
-
-    return data
-
-
-
-def Salesperson_info():
-
-    # Create a database connection
-    conn = engine_connect()
-
-    # SQL query code
-    query = """
-                    
-
-                    select 	distinct 
-                            rank() over (order by sum(totaldue) desc) as "Salesperson Ranking",
-                            trim(' 1 2 3 4 5 6 7 8 9 0 ' from trim('\ ' from trim('adventure-works' FROM cust.salesperson))) as "Sales Person",
-                            count(distinct cust.customerid) as "Total Customers Sale",
-                            sum(totaldue) as "Total Revenue from Salesperson",
-                            lag(sum(totaldue)) over (order by sum(totaldue) desc) - sum(totaldue) as "Salesperson Difference", 
-                            round((lag(sum(totaldue)) over (order by sum(totaldue) desc) - sum(totaldue))*100.0/
-                            lag(sum(totaldue)) over (order by sum(totaldue) desc),3) as " (%) Gap Percentage"
-                    from SalesLT.Customer cust
-                    inner join SalesLT.SalesOrderHeader sod 
-                        on cust.customerid = sod.customerid
-                    group by trim(' 1 2 3 4 5 6 7 8 9 0 ' from trim('\ ' from trim('adventure-works' FROM cust.salesperson)))
-
-"""
-
-# Read and Fatch data
-    query_data_read = pd.read_sql(query,conn)
-    data = pd.DataFrame(query_data_read)
-
-    return data
-
-
-def Product_Revenue_Report():
-
-    # Create a database connection
-    conn = engine_connect()
-
-    # SQL query code
-    query = """
-                    
-                    with report as (
-                    SELECT distinct
-                    pc.name as "Category Name",
-                    p.name as "Detailed Product Name",
-                    listprice as "Product Price",
-                    sum(orderqty) over ( partition by pc.name, p.name, listprice order by pc.name ) as "total qty orderd",
-                    sum(TotalDue) over ( partition by pc.name, p.name, listprice order by pc.name ) as "($) Total Revenue From product"
-                    FROM [SalesLT].[Product] as p
-                    inner join [SalesLT].[ProductCategory] as pc
-                           on p.ProductCategoryid = pc.ProductCategoryid
-                    inner join [SalesLT].ProductModel as pm
-                           on pm.ProductModelid = p.ProductModelid
-                    inner join [SalesLT].ProductModelProductDescription as pmp
-                           on pmp.ProductModelid = p.ProductModelid
-                    inner join [SalesLT].SalesOrderDetail as sod
-                           on sod.productid = p.productid
-                    inner join [SalesLT].SalesOrderHeader soh  
-                           on soh.salesorderid = sod.salesorderid ) 
-
-
-                    select RANK() over ( order by "($) Total Revenue From product" desc ) AS "Detailed Product Revenue Rank", 
-                              report.* 
-                    from report 
-                   
-
-            """
-
-# Read and Fatch data
-    query_data_read = pd.read_sql(query,conn)
-    data = pd.DataFrame(query_data_read)
-
-    return data
-
-def Customers_Taxes_Report():
-
-    # Create a database connection
-    conn = engine_connect()
-
-    # SQL query code
-    query = """
-                    
-
-                    with Tax_Info as (
-
-                        SELECT distinct
-                        cast(sod.SalesOrderID as varchar(25) ) as "Sales Order ID",
-                        c.CompanyName as "Company Name",
-                        concat(c.firstname, ' ', c.lastname) as "Full Name",
-                        TaxAmt as "Taxes Amount",
-                        Freight as "Freight Amount",
-                        sum(sod.OrderQty) over (partition by sod.SalesOrderID  order by sod.SalesOrderID ) as "Total Order Quentity"
-                        FROM [SalesLT].[Product] as p
-                        inner join [SalesLT].SalesOrderDetail as sod
-                               on sod.productid = p.productid
-                        inner join [SalesLT].SalesOrderHeader soh  
-                               on soh.salesorderid = sod.salesorderid
-                        inner join [SalesLT].customer c 
-                                  on c.customerid = soh.customerid
-                        ) 
-
-                        select rank() over(order by "Taxes Amount" desc) as "Tax Ranking For Customer", Tax_Info.*
-                        from Tax_Info 
-
-"""
-
-# Read and Fatch data
-    query_data_read = pd.read_sql(query,conn)
-    data = pd.DataFrame(query_data_read)
-
-    return data
-
-
-
-# function end 
 
 # ui function section 
-
 # section 1 on ui
 
 # UI info welcome text
@@ -377,149 +15,118 @@ st.write("***Phone: +972-526775714 , eMail: MosheKhorshidi@gmail.com***, ***Link
 st.info("Users can be **offline and get un-updated data from azure server**, for better usage test your connection first.")
 
 # test connection on azure database
+st.caption("**👇 Please Test Coonection to Azure SQL database**")
 if st.button("Test Connection To Database Server", key = 1):
     
     try:
-        
-        conn_setup = check_conn()
-        if conn_setup == True:
-            progress_text = "Test Connection in progress. Please wait."
-            my_bar = st.progress(0, text=progress_text)
+
+        progress_text = "Test Connection in progress. Please wait."
+        my_bar = st.progress(0, text=progress_text)
             
-            for percent_complete in range(100):
-                time.sleep(0.05)
-                my_bar.progress(percent_complete + 1, text=progress_text)
-            my_bar.empty()
-            st.success(f"Azure SQL Database session is **active**  :sunglasses: , time established:  **{datetime.datetime.now()}**", icon="✅")
-            st.snow()
+        for percent_complete in range(100):
+            time.sleep(0.03)
+            my_bar.progress(percent_complete + 1, text=progress_text)
+        my_bar.empty()
+        st.success(f"Azure SQL Database session is **active**  :sunglasses: , time established:  **{datetime.datetime.now()}**", icon="✅")
+
 
     except: 
             exception_message = '**Click F5 to reload page and Try to test connection again! Connection not active, user see not updated data (WebApp offline)**'
             st.info(exception_message)
-    finally:
-        collect_user_data()
+
 
 
 
 # UI info on section 1 of the webapp
-st.subheader("Section 1 - Database Exploration")
-st.header("Azure Database Tables Exploration", divider='violet')
-st.subheader("Select a table you want to explore Raw data on:")
+st.subheader("My Project Database Tables",divider='violet')
+#st.header("Azure Database Tables Exploration", divider='violet')
+#st.subheader("Select a table you want to explore Raw data on:")
 
-st.write("Click **'See table names button'** to see tables to explore raw data on the database (**user can copy name with 'CTRL C' or 'Copy' action on mobile** )") 
+st.markdown("Click **'See table names button'** to see tables names on my database") 
 
 if st.button("See Database tables names", key = 2):
 
-    result = azure_table_names()
+    result = pd.read_csv('table_names.csv')
 
     if result.all:
         
-        st.write("Table names on Azure datbase")
+        st.write("***Table names on Azure datbase:***")
         st.write(result)
         TableNamesQueryText = """
 
-            ***Azure SQL query snippet:***
+        /*Azure SQL query snippet*/
 
-
-                SELECT distinct 
-                       t.name as "Table Name",
-                       s.name as "Schema Name",
-                       s.schema_id as "Schema ID"
-                FROM sys.tables t inner join sys.schemas s
-	                ON t.schema_id = s.schema_id
-                where t.name not in('Customer', 'ErrorLog')
-                and s.name = 'SalesLT'
-                union 
-                select name,
-                      'SalesLT',
-                       schema_id 
-                from sys.views
+        SELECT distinct 
+                t.name as "Table Name",
+                s.name as "Schema Name",
+                s.schema_id as "Schema ID"
+        FROM sys.tables t inner join sys.schemas s
+            ON t.schema_id = s.schema_id
+        where t.name not in('Customer', 'ErrorLog')
+        and s.name = 'SalesLT'
+        union 
+        select name,'SalesLT', schema_id 
+        from sys.views
 
             """
-        st.write(TableNamesQueryText)
-        st.button("Close table and code snipp", key = 3)
+        st.code(TableNamesQueryText, language='sql')
+        st.button("Close tables names and code snipp", key = 3)
         
     else:
         
         data_container = st.empty()  # Create an empty container
         data_container.info("No Data on this table: empty result")     
-
-
-# see db tables raw data and query tables
-options = st.selectbox('Choose table name to explore',
-                         ('No Table name selected','CustomerInfo', 'ProductModel', 'ProductDescription', 'Product',
-                          'ProductCategory', 'Address', 'CustomerAddress', 'SalesOrderDetail',
-                          'SalesOrderHeader', 'ProductModelProductDescription'))
-option_massege = st.write("Table to query: ", options) 
-user_choosen_table = options
-
-if st.button("Run query on table", key = 4):
-    result = query_builder(user_choosen_table)
-    st.write(result)
-    if user_choosen_table != 'No Table name selected':
-        st.write(f""" 
-               
-            ***Azure SQL query snippet:***
-             
-                select * from SalesLT.{user_choosen_table} order by 1 asc
-                
-                """)    
-        st.button("Close table and code snipp", key = 5)
-    else:
-        st.button("Close user check")
-
    
 # section 2 on ui - sql reports 
 
-st.subheader("Section 2 - Company Database Reports")
-st.header("Company Azure Database Reports", divider='violet')
+st.subheader("My Company C level Database Reports", divider='violet')
+#st.header("Company Azure Database Reports", divider='violet')
 
-st.subheader("Select your relevant report")
-
-reports_options = st.selectbox(' ',
+reports_options = st.selectbox('***Select your relevant report***',
                          ('No report selected','Customer Ranking Report','Sales Person details','Product Revenue Report'
                           ,'Customers Taxes Report'))
-reports_massege = st.write("Report Presented: ", reports_options) 
+reports_massege = st.write("***Report that will execute and Presented is:***", reports_options) 
 user_choosen_report = reports_options
 
 if st.button("Execute Report"):
     if user_choosen_report == 'Customer Ranking Report':
-        result = customer_ranking_report()
-        st.write(result)
-        query_text = """ 
+        result = pd.read_csv('customer_ranking_report.csv')
+        st.dataframe(result)
+        Customer_Ranking_Report_code = """ 
 
-                ***Azure SQL query snippet:***
+        /*Azure SQL query snippet*/
 
-            select 
+        select 
 
-                RANK() over (order by sum(sod.OrderQty) desc) as "Customer Ranking",
-                cast(c.customerid as varchar(25)) as "Customer ID",
-                c.CompanyName as "Company Name",
-                CONCAT(FirstName,' ' ,LastName) as "Full Name",
-                case when Title = 'Mr.' then 'M'
-                     when Title = 'Ms.' then 'F'
-                else null end as "Gender",
-                count(soh.salesOrderID) as "Total Orders",
-                sum(sod.OrderQty) as "Total Quentity Orderd",
-		        round(sum(sod.linetotal),3) as "Total revenue from customer $" 
+            RANK() over (order by sum(sod.OrderQty) desc) as "Customer Ranking",
+            cast(c.customerid as varchar(25)) as "Customer ID",
+            c.CompanyName as "Company Name",
+            CONCAT(FirstName,' ' ,LastName) as "Full Name",
+            case when Title = 'Mr.' then 'M'
+                    when Title = 'Ms.' then 'F'
+            else null end as "Gender",
+            count(soh.salesOrderID) as "Total Orders",
+            sum(sod.OrderQty) as "Total Quentity Orderd",
+            round(sum(sod.linetotal),3) as "Total revenue from customer $" 
 
-            from SalesLT.Customer c 
-            LEFT JOIN SalesLT.CustomerAddress ca 
-                ON c.customerid = ca.customerid
-            LEFT JOIN SalesLT.SalesOrderHeader soh
-                ON soh.customerid = c.customerid
-            LEFT JOIN SalesLT.salesOrderDetail sod
-                ON sod.salesOrderID = soh.salesOrderID
-            group by c.customerid, Title , CONCAT(FirstName,' ' ,LastName), c.CompanyName
-            having count(soh.salesOrderID) > 0 
+        from SalesLT.Customer c 
+        LEFT JOIN SalesLT.CustomerAddress ca 
+            ON c.customerid = ca.customerid
+        LEFT JOIN SalesLT.SalesOrderHeader soh
+            ON soh.customerid = c.customerid
+        LEFT JOIN SalesLT.salesOrderDetail sod
+            ON sod.salesOrderID = soh.salesOrderID
+        group by c.customerid, Title , CONCAT(FirstName,' ' ,LastName), c.CompanyName
+        having count(soh.salesOrderID) > 0 
 
                      """
-        st.write(query_text)
-        st.button("close reports")
+        st.code(Customer_Ranking_Report_code, language='sql') 
+        st.button("close report")
+    
     elif user_choosen_report == 'Sales Person details':
-         result = Salesperson_info()
-         st.write(result)
-         st.write("""
+         result = pd.read_csv('Salesperson_info.csv')
+         st.table(result)
+         Sales_Person_details = """
                 
             ***Azure SQL query snippet:***
                   
@@ -536,14 +143,15 @@ if st.button("Execute Report"):
                     on cust.customerid = sod.customerid
                 group by trim(' 1 2 3 4 5 6 7 8 9 0 ' from trim('\ ' from trim('adventure-works' FROM cust.salesperson)))
                   
-                    """)
+                    """
          
-         st.button("close reports")
+         st.code(Sales_Person_details, language='sql') 
+         st.button("close report")
 
     elif user_choosen_report == 'Product Revenue Report':
-        result = Product_Revenue_Report()
+        result = pd.read_csv('Product_Revenue_Report.csv')
         st.write(result)
-        query_text = """ 
+        Product_Revenue_Report = """ 
 
                 ***Azure SQL query snippet:***
 
@@ -574,12 +182,14 @@ if st.button("Execute Report"):
                     from report 
 
                      """
-        st.write(query_text)
-        st.button("close reports")
+        st.code(Product_Revenue_Report, language='sql') 
+        st.button("close report")
+
     elif user_choosen_report == 'Customers Taxes Report':
-        result = Customers_Taxes_Report()
-        st.write(result)
-        query_text = """ 
+        result = pd.read_csv('Customers_Taxes_Report.csv')
+        st.dataframe(result)
+        
+        Customers_taxes_report = """ 
 
                 ***Azure SQL query snippet:***
 
@@ -605,8 +215,8 @@ if st.button("Execute Report"):
                         from Tax_Info 
 
                      """
-        st.write(query_text)
-        st.button("Close reports") 
+        st.code(Customers_taxes_report,language='sql')
+        st.button("Close report") 
 
     else:
          st.info("""
@@ -620,39 +230,45 @@ if st.button("Execute Report"):
                 3. try to test connection again
                  
                  """)
+         
          st.button("Close user check")
          
          
       
-st.subheader("Section 3 - Data Visualization")
-st.header("Company Data Visualization", divider='violet')
+st.subheader("My Company C level Data Visualization",divider='violet')
 
-st.subheader("Select your Vizz and click analyze visual")
-        
-vizz_options = st.selectbox(' ',
+vizz_options = st.selectbox("***Select your Vizz and click analyze visual***",
                          ('No Vizz selected','Top Ranking Customers by Quentity Orderd','Top Ranking Customers by Revenue'))
 vizz_massege = st.write("Vizz Presented: ", vizz_options) 
 user_choosen_vizz = vizz_options
 
 if st.button("Analyze Visual"):
     if user_choosen_vizz == 'Top Ranking Customers by Quentity Orderd':
-        result = top_ranking_report_customers_qty()
+        result = pd.read_csv('top_ranking_report_customers_qty.csv')
+        
         chart_data = result
+
         st.bar_chart(chart_data,x="Vizz Company Rank", y=["Total Quentity Orderd","Total Orders"])
 
 
         vizz_text = "***Note: Analyze top ranked customers by the total orders and quantity of products purchasing***"
+        
         st.info(vizz_text)
+        
         st.button("Close Selected Vizz")
 
     elif user_choosen_vizz == 'Top Ranking Customers by Revenue':
-        result = top_ranking_report_customers_revenue()
+        result = pd.read_csv('top_ranking_report_customers_revenue.csv')
+        
         chart_data = result
+        
         st.bar_chart(chart_data,x="Vizz Company Rank", y="($) Total revenue from customer")
 
 
         vizz_text = "***Note: Analyze top ranked customers by the revenue inserted to the company***"
+        
         st.info(vizz_text)
+        
         st.button("Close Selected Vizz")
     
     else:
@@ -668,7 +284,5 @@ if st.button("Analyze Visual"):
                 3. try to test connection again
                  
                  """)
+         
          st.button("Close user check")
-
-
-
