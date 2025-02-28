@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title = "Moshe Khorshidi DE Test App",Layout = "wide", page_icon = "📂")
+st.set_page_config(page_title="Moshe Khorshidi DE Test App", layout="wide", page_icon="📂")
 
 def main():
     # Application title and header
