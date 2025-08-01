@@ -9,7 +9,7 @@ import time
 # UI info welcome text
 st.title("Azure Store Report Manager UI")
 st.write("Welcome to report manager and azure database exploration ***Web application***, developed by **Moshe Khorshidi**.")
-st.write("***Phone: +972-526775714 , eMail: MosheKhorshidi@gmail.com***, ***LinkedIn:*** [My LinkedIn Profile 👋](https://www.linkedin.com/in/moshe-khorshidi-sql-python-tableau-data-analysis-bi-engineering-curiosity-for-innovation/) ")
+st.write("***Phone: +972-526775714 , eMail: MosheKhorshidi@gmail.com***, ***LinkedIn:*** [My LinkedIn Profile 👋](https://www.linkedin.com/in/moshe-khorshidi-cloud-data-engineer-azure-aws-gcp-spark-airflow-kafka-pyspark-sql-python-bi-analysis/) ")
 
 # information message to user on test connection on azure database
 st.info("Users can be **offline and get un-updated data from azure server**, for better usage test your connection first.")
@@ -286,6 +286,7 @@ if st.button("Analyze Visual"):
                  """)
          
          st.button("Close user check")
+
 
 
 
