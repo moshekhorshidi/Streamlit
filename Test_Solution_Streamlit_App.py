@@ -178,8 +178,9 @@ WHERE e.userid = @UserID
 
     # Add a footer note in the sidebar
     st.sidebar.markdown("---")
-    st.sidebar.markdown("Test Solution Streamlit App")
+    st.sidebar.markdown("MosheKhorshidi@Gmail.com")
 
 if __name__ == "__main__":
     main()
+
 
