@@ -1,5 +1,7 @@
 import streamlit as st
 import pandas as pd
+from streamlit_navigation_bar import st_navbar
+
 
 st.set_page_config(page_title="Moshe Khorshidi DE Test App", layout="wide", page_icon="📂")
 
@@ -8,11 +10,20 @@ def main():
     st.title("Data Engineering by Moshe Khorshidi")
     st.header("Scalable SQL Schema & Query System for Folder Events")
 
-    # Sidebar navigation
-    st.sidebar.title("Navigation")
-    section = st.sidebar.radio("Select Section", 
-                               ["Overview", "Schema Design", "DDL Code", "Indexing", 
-                                "Folder_Hierarchy", "Queries", "Bonus Data Flow Diagram"])
+    section = st_navbar(
+    menu_items=[
+        "Overview",
+        "Schema Design",
+        "DDL Code",
+        "Indexing",
+        "Folder_Hierarchy",
+        "Queries",
+        "Bonus Data Flow Diagram"
+    ],
+    selected="Overview",
+    nav_type="pills",      # "tabs" and "buttons" also available
+    hide_nav=False
+)
 
     if section == "Overview":
         st.markdown(""" 
@@ -182,5 +193,6 @@ WHERE e.userid = @UserID
 
 if __name__ == "__main__":
     main()
+
 
 
