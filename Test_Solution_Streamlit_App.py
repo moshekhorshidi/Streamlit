@@ -5,7 +5,7 @@ st.set_page_config(page_title="Moshe Khorshidi DE Test App", layout="wide", page
 
 def main():
     # Application title and header
-    st.title("Test Solution Presentation")
+    st.title("Data Engineering by Moshe Khorshidi")
     st.header("Scalable SQL Schema & Query System for Folder Events")
 
     # Sidebar navigation
@@ -182,3 +182,4 @@ WHERE e.userid = @UserID
 
 if __name__ == "__main__":
     main()
+
